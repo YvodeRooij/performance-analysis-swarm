@@ -1,0 +1,19 @@
+{
+  "name": "performance-analysis-swarm",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@langchain/core": "^0.3.42",
+    "@langchain/langgraph": "^0.2.54",
+    "@langchain/langgraph-swarm": "^0.0.3",
+    "@langchain/openai": "^0.4.4",
+    "zod": "^3.24.2"
+  }
+}
