@@ -7,14 +7,11 @@ const model = new ChatOpenAI({ modelName: "gpt-4o" });
 
 export const sessionAnalyzer = createReactAgent({
   llm: model,
-  tools: [
-    analyzeTranscript,
-    createHandoffTool({
-      agentName: "MetricsCalculator",
-      description: "Hand off the analysis to MetricsCalculator for scoring.",
-    }),
-  ],
+  tools: [analyzeTranscript, createHandoffTool({ agentName: "QualityJudge", description: "Hand off to QualityJudge for evaluation." })],
   name: "SessionAnalyzer",
-  prompt:
-    "You are the Session Analyzer. Your job is to analyze the provided interview transcript using the analyzeTranscript tool. Once you have the analysis, hand off the result to MetricsCalculator in a separate step.",
+  prompt: `
+    You are the SessionAnalyzer. Use the analyzeTranscript tool to analyze the transcript.
+    If there are feedback messages containing 'Feedback for Analysis #', use the latest one to improve your analysis.
+    After producing the analysis, hand off to QualityJudge.
+  `,
 });

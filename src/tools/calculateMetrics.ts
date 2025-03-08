@@ -2,7 +2,7 @@ import { z } from "zod";
 import { tool } from "@langchain/core/tools";
 import { ChatOpenAI } from "@langchain/openai";
 
-const model = new ChatOpenAI({ modelName: "o3-mini" });
+const model = new ChatOpenAI({ modelName: "gpt-4o" });
 
 const metricsSchema = z.object({
   skills: z.object({
@@ -24,18 +24,19 @@ export const calculateMetrics = tool(
     `;
 
     const response = await model.invoke(prompt);
-    const content = response.content as string;
+    let content = response.content as string;
+    content = content.replace(/```json\n|\n```/g, "").trim();
     try {
       const parsed = JSON.parse(content);
-      metricsSchema.parse(parsed); // Validate with Zod
-      return JSON.stringify(parsed);
+      metricsSchema.parse(parsed);
+      return `Metrics Output: ${JSON.stringify(parsed)}`;
     } catch (error) {
       throw new Error(`Invalid LLM response: ${content}`);
     }
   },
   {
     name: "calculate_metrics",
-    description: "Quantify performance across consulting skills based on transcript analysis",
+    description: "Calculate performance metrics from analyzed data",
     schema: z.object({ analyzedData: z.string() }),
   }
 );
