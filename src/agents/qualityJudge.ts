@@ -1,34 +1,66 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { createHandoffTool } from "@langchain/langgraph-swarm";
+import { evaluateOutput } from "../tools/evaluateOutput";
 
-const model = new ChatOpenAI({ modelName: "gpt-4o" });
+// Get API key from environment or provide directly
+const apiKey = process.env.OPENAI_API_KEY;
+
+const model = new ChatOpenAI({
+  modelName: "gpt-4o",
+  apiKey: apiKey,
+});
 
 export const qualityJudge = createReactAgent({
   llm: model,
   tools: [
-    createHandoffTool({ agentName: "SessionAnalyzer", description: "Hand off back to SessionAnalyzer with feedback." }),
-    createHandoffTool({ agentName: "MetricsCalculator", description: "Hand off to MetricsCalculator." }),
-    createHandoffTool({ agentName: "ReportGenerator", description: "Hand off to ReportGenerator." }),
+    evaluateOutput,
+    createHandoffTool({
+      agentName: "SessionAnalyzer",
+      description: "Hand off back to SessionAnalyzer with feedback.",
+    }),
+    createHandoffTool({
+      agentName: "MetricsCalculator",
+      description: "Hand off to MetricsCalculator with the analysis.",
+    }),
+    createHandoffTool({
+      agentName: "ReportGenerator",
+      description: "Hand off to ReportGenerator with the metrics.",
+    }),
   ],
   name: "QualityJudge",
   prompt: `
-    You are the Quality Judge. Look for the most recent message containing 'Analysis Output:', 'Metrics Output:', or 'Report Output:'.
-    Extract the JSON part after the label.
-    Evaluate it for quality:
-    - For 'Analysis Output:', check clarity of patterns, strengths, weaknesses.
-    - For 'Metrics Output:', check accuracy and relevance of scores.
-    - For 'Report Output:', check readability and actionability.
-    Assign a score out of 10.
-    Determine the step:
-    - If 'Analysis Output:', step is 'Analysis'
-    - If 'Metrics Output:', step is 'Metrics'
-    - If 'Report Output:', step is 'Report'
-    Count how many messages contain 'Feedback for [step] #'.
-    If the score is 7 or higher, or the count is 3 or more, approve the output.
-    - For 'Analysis', hand off to MetricsCalculator.
-    - For 'Metrics', hand off to ReportGenerator.
-    - For 'Report', output 'Process completed. Final report approved.' and do not call any tool.
-    If the score is less than 7 and the count is less than 3, provide feedback in the format 'Feedback for [step] #[count+1]: [your feedback]' and hand off back to the corresponding agent.
+    You are the Quality Judge responsible for ensuring all outputs meet high standards.
+    
+    When you receive a message, your tasks are:
+    
+    1. Identify the output type based on these patterns:
+       - If it contains "Analysis Output:", the type is "Analysis" and source is "SessionAnalyzer"
+       - If it contains "Metrics Output:", the type is "Metrics" and source is "MetricsCalculator" 
+       - If it contains "Report Output:", the type is "Report" and source is "ReportGenerator"
+       
+    2. Extract the JSON content after the output label
+    
+    3. Use the evaluateOutput tool to evaluate the content against specific criteria:
+       - For Analysis: comprehensiveness, evidence-based, insight quality, balance, actionability
+       - For Metrics: accuracy, consistency, depth, benchmarking, actionability
+       - For Report: clarity, comprehensiveness, visual quality, actionability, structure
+    
+    4. Based on the evaluation results:
+       a. If the output PASSES (score ≥ 7.0 or 2+ feedback iterations):
+          - For Analysis: hand off to MetricsCalculator
+          - For Metrics: hand off to ReportGenerator
+          - For Report: respond with "Process completed. Final report approved."
+       
+       b. If the output FAILS (score < 7.0 and less than 2 feedback iterations):
+          - Count how many messages contain "Feedback for [Type] #"
+          - Provide feedback in the format "Feedback for [Type] #[count+1]: [detailed feedback]"
+          - Hand off back to the corresponding agent
+    
+    Remember:
+    - Be thorough and specific in your evaluations
+    - Provide actionable feedback for improvements
+    - Balance quality requirements with practical constraints
+    - After 2 feedback iterations, approve the output even if below threshold
   `,
 });
