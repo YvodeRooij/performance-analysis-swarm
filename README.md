@@ -113,22 +113,54 @@ SHOW_QUALITY_DETAILS=true
 SHOW_WORKFLOW_STEPS=true
 ```
 
-3. Run the full analysis pipeline (note: currently only completes the first analysis stage):
+3. Run the LangGraph Swarm implementation (based on example-swarm.md):
 ```bash
+# Run the full swarm implementation
 npx ts-node src/index.ts
+
+# Test the mock swarm pipeline for demonstration
+npx ts-node src/testMockSwarm.ts
 ```
 
-4. Test just the individual components:
+4. Using the LangGraph Swarm in your application:
+```typescript
+import { runEnhancedSwarm } from "./src/index";
+
+async function generateWorldClassAnalysis() {
+  const transcript = "Your interview transcript text here...";
+  const results = await runEnhancedSwarm(transcript);
+  
+  // Access the final report
+  console.log(results.finalOutputs.report);
+  
+  // Access workflow metrics
+  console.log(`Quality score: ${results.executionStats.averageScores.ReportGenerator}`);
+  console.log(`Steps completed: ${results.workflowSteps.length}`);
+}
+```
+
+5. Test individual components:
 ```bash
 npx ts-node src/testComponents.ts
 ```
 
-5. Test the mock swarm pipeline that demonstrates the full workflow:
+6. See the detailed pipeline in action:
 ```bash
 npx ts-node src/testMockSwarm.ts
 ```
 
-> **Note**: All individual components are functioning correctly, and the mock swarm pipeline demonstrates the entire workflow. The LangGraph Swarm implementation for fully automated workflows has TypeScript compatibility challenges that are being addressed. See ISSUES.md for technical details.
+> **Note**: This system implements a LangGraph Swarm as demonstrated in example-swarm.md. The implementation uses the prescribed pattern with agent handoffs and state management following the LangGraph Swarm library standards. While there are some TypeScript compatibility challenges, the core swarm functionality is preserved.
+
+The key benefits of the LangGraph Swarm architecture:
+1. **Multi-agent collaboration** - Specialized agents working together through well-defined handoffs
+2. **Quality control system** - Dedicated QualityJudge agent enforcing evidence standards
+3. **Feedback loops** - Built-in revision cycles with specific feedback
+4. **Evidence-first approach** - All assessments backed by direct quotes and concrete evidence
+5. **Balance assessment** - Fair evaluation of both strengths and weaknesses 
+6. **Professional reporting** - Beautiful reports with proper structure and formatting
+7. **Full workflow transparency** - Detailed visibility into the entire agent interaction process
+
+To better understand the implementation pattern, see the `example-swarm.md` file which shows the recommended approach for LangGraph Swarm in TypeScript.
 
 ### Working with Individual Components
 
