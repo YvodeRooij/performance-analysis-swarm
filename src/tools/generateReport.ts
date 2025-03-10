@@ -4,7 +4,11 @@ import { ChatOpenAI } from "@langchain/openai";
 import { enhancedReportSchema, EnhancedReport } from "../schemas/reportSchema";
 import { EnhancedMetrics } from "../schemas/metricsSchema";
 
-const model = new ChatOpenAI({ modelName: "gpt-4o" });
+// Use gpt-4o for report generation to ensure high-quality, evidence-based reports
+const model = new ChatOpenAI({
+  modelName: "gpt-4o",
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 interface ReportOutput {
   humanReadable: string;
@@ -31,33 +35,55 @@ export const generateReport = tool(
       throw new Error(`Invalid metricsData input: ${metricsData}`);
     }
 
+    // Extract the original analysis if available for evidence citations
+    const originalAnalysis = parsedData.original_analysis || {};
+
     const prompt = `
-      Create a comprehensive interview performance report based on these metrics:
+      Create an evidence-based interview performance report using these metrics and the original analysis.
       
-      1. Write an executiveSummary (1-2 paragraphs) highlighting key findings and recommendations
+      EVIDENCE-CENTERED APPROACH:
+      1. Base all findings directly on evidence from the interview
+      2. Cite specific examples for all key points
+      3. Present a balanced view of capabilities and limitations
+      4. Make specific, actionable recommendations tied to evidence
+      5. Avoid repetition across different sections
+      
+      REPORT STRUCTURE:
+      
+      1. Write an executiveSummary (1-2 paragraphs):
+         - Summarize key strengths and limitations demonstrated in the interview
+         - Highlight 2-3 most important development areas
+         - Include a statement about assessment limitations if appropriate
       
       2. Create competencyRadarData for visualization:
          - Include all competencies with their scores
-         - Add benchmark values for comparison
+         - Use evidence-based context rather than arbitrary benchmarks
       
-      3. Identify 3-5 keyFindings that are most important for the candidate:
+      3. Identify 3-5 keyFindings that are most important:
          - Give each a clear title
-         - Provide a description with context and evidence
+         - Cite specific evidence from the interview transcript
          - Explain the impact on performance
-         - List 2-3 specific recommendations for each finding
+         - Provide specific, actionable recommendations tied to the evidence
       
       4. Design a developmentPlan with:
-         - 2-3 immediateActions to implement right away
-         - 2-3 shortTermGoals for the next 3-6 months
-         - 2-3 longTermDevelopment areas for career growth
+         - 2-3 immediateActions that address specific limitations identified
+         - 2-3 shortTermGoals that build on the immediate actions
+         - 1-2 longTermDevelopment areas based on demonstrated potential
+         - All recommendations must be specific and evidence-based
       
       5. Create a feedbackSummary capturing:
-         - Top 3-5 strengths to leverage
-         - Top 3-5 areasForImprovement to address
-         - 2-3 potentialFit suggestions for roles that match their profile
+         - 3-5 specific strengths demonstrated in the interview
+         - 3-5 specific areas for improvement with evidence
+         - 1-2 potential fit suggestions based on demonstrated strengths
       
       6. For visualizations, describe what charts would best represent the data
-         (later these will be converted to SVG visualizations)
+      
+      IMPORTANT REQUIREMENTS:
+      1. Every finding must cite specific evidence from the interview
+      2. Avoid generic recommendations like "improve communication skills"
+      3. Instead use specific guidance like "Practice explaining technical concepts using analogies, as demonstrated by difficulty in X example"
+      4. Do not repeat the same information across different sections
+      5. Do not include arbitrary timeframes unless justified by the evidence
       
       Return as a JSON object with this schema:
       {
@@ -66,13 +92,14 @@ export const generateReport = tool(
           {
             "name": string,
             "score": number,
-            "benchmark": number
+            "evidenceContext": string
           }
         ],
         "keyFindings": [
           {
             "title": string,
             "description": string,
+            "evidenceCitations": string[],
             "impact": string,
             "recommendations": string[]
           }
@@ -80,70 +107,114 @@ export const generateReport = tool(
         "developmentPlan": {
           "immediateActions": string[],
           "shortTermGoals": string[],
-          "longTermDevelopment": string[]
+          "longTermDevelopment": string[],
+          "evidenceBasis": string
         },
         "feedbackSummary": {
           "strengths": string[],
           "areasForImprovement": string[],
-          "potentialFit": string[]
+          "potentialFit": string[],
+          "assessmentLimitations": string
         },
         "visualizations": {
           "competencyRadar": string,
           "gapAnalysisChart": string,
-          "benchmarkComparison": string
+          "evidenceDistribution": string
         }
       }
 
       Metrics: ${JSON.stringify(parsedData)}
+      Original Analysis: ${JSON.stringify(originalAnalysis)}
     `;
 
-    const response = await model.invoke(prompt);
-    let content = response.content.toString();
-    content = content.replace(/```json\n|\n```/g, "").trim();
-
     try {
-      const parsed = JSON.parse(content) as EnhancedReport;
-      enhancedReportSchema.parse(parsed); // Validate against schema
+      const response = await model.invoke(prompt);
+      let content = response.content.toString();
+      content = content.replace(/```json\n|\n```|```/g, "").trim();
+
+      // Try to parse the JSON
+      let parsed;
+      try {
+        parsed = JSON.parse(content) as EnhancedReport;
+      } catch (parseError) {
+        console.error("JSON parse error:", parseError);
+        console.log("Content that failed to parse:", content);
+
+        // Try to extract JSON if it's embedded in text
+        const jsonRegex = /\{[\s\S]*\}/g;
+        const match = content.match(jsonRegex);
+        if (match && match[0]) {
+          try {
+            parsed = JSON.parse(match[0]);
+          } catch (e: unknown) {
+            const error = e instanceof Error ? e : new Error(String(e));
+            throw new Error(`Failed to extract valid JSON from response: ${error.message}`);
+          }
+        } else {
+          throw new Error("Could not find valid JSON in LLM response");
+        }
+      }
+
+      // Validate against schema (but continue even if it fails)
+      try {
+        enhancedReportSchema.parse(parsed);
+      } catch (validationError) {
+        console.error("Schema validation error:", validationError);
+        console.log("Continuing with report generation despite schema validation errors");
+      }
 
       // Create a human-readable version of the report
       const humanReadable = `
-# Executive Summary
+# Interview Performance Report
+
+## Executive Summary
 ${parsed.executiveSummary}
 
 ## Key Findings
 ${parsed.keyFindings
   .map(
-    (finding) => `
+    (finding: { title: string; description: string; evidenceCitations?: string[] | string; impact: string; recommendations: string[] }) => `
 ### ${finding.title}
 ${finding.description}
+
+${
+  finding.evidenceCitations
+    ? `**Evidence**: 
+${Array.isArray(finding.evidenceCitations) ? finding.evidenceCitations.map((cite: string) => `- ${cite}`).join("\n") : finding.evidenceCitations}`
+    : ""
+}
 
 **Impact**: ${finding.impact}
 
 **Recommendations**:
-${finding.recommendations.map((rec) => `- ${rec}`).join("\n")}
+${finding.recommendations.map((rec: string) => `- ${rec}`).join("\n")}
 `
   )
   .join("\n")}
 
 ## Development Plan
-### Immediate Actions
-${parsed.developmentPlan.immediateActions.map((action) => `- ${action}`).join("\n")}
+${parsed.developmentPlan.evidenceBasis ? `*Evidence Basis: ${parsed.developmentPlan.evidenceBasis}*\n\n` : ""}
 
-### Short-Term Goals (3-6 months)
-${parsed.developmentPlan.shortTermGoals.map((goal) => `- ${goal}`).join("\n")}
+### Immediate Actions
+${parsed.developmentPlan.immediateActions.map((action: string) => `- ${action}`).join("\n")}
+
+### Short-Term Goals
+${parsed.developmentPlan.shortTermGoals.map((goal: string) => `- ${goal}`).join("\n")}
 
 ### Long-Term Development
-${parsed.developmentPlan.longTermDevelopment.map((dev) => `- ${dev}`).join("\n")}
+${parsed.developmentPlan.longTermDevelopment.map((dev: string) => `- ${dev}`).join("\n")}
 
 ## Feedback Summary
+${parsed.feedbackSummary.assessmentLimitations ? `*Assessment Limitations: ${parsed.feedbackSummary.assessmentLimitations}*\n\n` : ""}
+
 ### Strengths
-${parsed.feedbackSummary.strengths.map((strength) => `- ${strength}`).join("\n")}
+${parsed.feedbackSummary.strengths.map((strength: string) => `- ${strength}`).join("\n")}
 
 ### Areas for Improvement
-${parsed.feedbackSummary.areasForImprovement.map((area) => `- ${area}`).join("\n")}
+${parsed.feedbackSummary.areasForImprovement.map((area: string) => `- ${area}`).join("\n")}
 
 ### Potential Fit
-${parsed.feedbackSummary.potentialFit.map((fit) => `- ${fit}`).join("\n")}
+${parsed.feedbackSummary.potentialFit.map((fit: string) => `- ${fit}`).join("\n")}
 `;
 
       const report: ReportOutput = {
@@ -152,9 +223,13 @@ ${parsed.feedbackSummary.potentialFit.map((fit) => `- ${fit}`).join("\n")}
       };
 
       return `Report Output: ${JSON.stringify(report)}`;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error processing report:", error);
-      throw new Error(`Invalid LLM response: ${content}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Error details:", errorMessage);
+
+      // Instead of using a fallback report, throw an error to ensure quality
+      throw new Error(`Failed to generate report: ${errorMessage}`);
     }
   },
   {

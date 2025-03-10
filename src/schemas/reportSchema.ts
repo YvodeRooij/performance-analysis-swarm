@@ -7,7 +7,9 @@ export const enhancedReportSchema = z.object({
     z.object({
       name: z.string(),
       score: z.number(),
-      benchmark: z.number(),
+      // Allow either benchmark or evidenceContext
+      benchmark: z.number().optional(),
+      evidenceContext: z.string().optional(),
     })
   ),
 
@@ -17,6 +19,8 @@ export const enhancedReportSchema = z.object({
       description: z.string(),
       impact: z.string(),
       recommendations: z.array(z.string()),
+      // New evidence-based field
+      evidenceCitations: z.union([z.array(z.string()), z.string()]).optional(),
     })
   ),
 
@@ -24,18 +28,24 @@ export const enhancedReportSchema = z.object({
     immediateActions: z.array(z.string()),
     shortTermGoals: z.array(z.string()),
     longTermDevelopment: z.array(z.string()),
+    // New evidence-based field
+    evidenceBasis: z.string().optional(),
   }),
 
   feedbackSummary: z.object({
     strengths: z.array(z.string()),
     areasForImprovement: z.array(z.string()),
     potentialFit: z.array(z.string()),
+    // New evidence-based field
+    assessmentLimitations: z.string().optional(),
   }),
 
   visualizations: z.object({
     competencyRadar: z.string().optional(), // SVG data
     gapAnalysisChart: z.string().optional(), // SVG data
     benchmarkComparison: z.string().optional(), // SVG data
+    // New evidence-based field
+    evidenceDistribution: z.string().optional(), // SVG data
   }),
 });
 

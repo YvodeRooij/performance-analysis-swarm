@@ -1,3 +1,7 @@
+// Load environment variables from .env file
+import dotenv from "dotenv";
+dotenv.config();
+
 import { MemorySaver } from "@langchain/langgraph";
 import { createSwarm } from "@langchain/langgraph-swarm";
 import { sessionAnalyzer } from "./agents/sessionAnalyzer";
@@ -7,6 +11,11 @@ import { qualityJudge } from "./agents/qualityJudge";
 import { categorizeOutputs, calculateExecutionStats } from "./utils/agentInstrumentation";
 import crypto from "crypto";
 import { consultingInterviewTranscript } from "./transcripts/consultingInterview";
+
+// Verify that the API key is loaded
+if (!process.env.OPENAI_API_KEY) {
+  console.warn("Warning: OPENAI_API_KEY not found in environment variables. Make sure it's set in the .env file.");
+}
 
 // Define result interface
 interface EnhancedSwarmResult {

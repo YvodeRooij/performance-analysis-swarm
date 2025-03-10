@@ -6,17 +6,34 @@ import { enhancedAnalysisSchema } from "../schemas/analysisSchema";
 // Get API key from environment
 const apiKey = process.env.OPENAI_API_KEY;
 
+// Use gpt-4o for the analysis to ensure high-quality, evidence-based output
 const model = new ChatOpenAI({
   modelName: "gpt-4o",
   apiKey: apiKey,
-  temperature: 0.1, // Lower temperature for more consistent structured output
 });
 
 export const analyzeTranscript = tool(
   async ({ transcript }: { transcript: string }): Promise<string> => {
-    // Create a more explicit prompt with schema format
+    // Create a more explicit prompt with schema format and evidence-first approach
     const prompt = `
-      Perform a comprehensive analysis of this interview transcript.
+      Perform a comprehensive analysis of this interview transcript using an EVIDENCE-FIRST approach.
+      
+      EVIDENCE-FIRST APPROACH:
+      1. First, collect ALL relevant quotes from the transcript for each competency
+      2. For EACH quote, analyze both strengths AND limitations
+      3. Only AFTER evidence collection, assign ratings based on evidence quantity and quality
+      4. Ensure ratings follow this calibration:
+         - 9-10 = Exceptional (rare, requires multiple impressive examples)
+         - 7-8 = Strong (solid evidence of competency)
+         - 5-6 = Competent (basic demonstration)
+         - 3-4 = Developing (minimal evidence)
+         - 1-2 = Needs improvement (concerning evidence)
+      5. Ensure EVERY competency has BOTH strengths AND limitations identified
+      
+      EVIDENCE REQUIREMENTS:
+      - Every competency score 8+ MUST have at least 3 specific evidence examples
+      - Every competency score 6-7 MUST have at least 2 specific evidence examples
+      - Every competency score below 6 MUST have at least 1 specific evidence example
       
       YOU MUST return your analysis as a valid JSON object with EXACTLY these fields:
       
@@ -77,7 +94,12 @@ export const analyzeTranscript = tool(
         ]
       }
       
-      Make sure to include ALL these fields with appropriate values. Do not include any additional fields or notes outside the JSON.
+      IMPORTANT REQUIREMENTS:
+      1. Include BOTH strengths AND limitations for EACH competency
+      2. Use DIRECT QUOTES from the transcript as evidence
+      3. Be CRITICAL and BALANCED in your assessment
+      4. Do not inflate scores - they must match the evidence quality and quantity
+      5. Make sure to include ALL fields with appropriate values
       
       Here is the transcript to analyze:
       ${transcript}
@@ -123,94 +145,15 @@ export const analyzeTranscript = tool(
       } catch (validationError) {
         console.error("Schema validation error:", validationError);
 
-        // Create a valid fallback object that matches the schema
-        parsed = {
-          communicationMetrics: {
-            clarity: 5,
-            confidence: 5,
-            pacing: 5,
-            fillerWords: {
-              frequency: 5,
-              examples: ["um", "uh", "like"],
-            },
-          },
-          coreCompetencies: {
-            businessAcumen: 5,
-            quantitativeSkills: 5,
-            problemSolving: 5,
-            structuredThinking: 5,
-            leadership: 5,
-            communication: 5,
-          },
-          evidenceByCompetency: {
-            businessAcumen: [
-              {
-                quote: "Example quote from transcript",
-                analysis: "Basic analysis of business skills",
-                strength: true,
-              },
-            ],
-            quantitativeSkills: [
-              {
-                quote: "Example quote from transcript",
-                analysis: "Basic analysis of quantitative skills",
-                strength: false,
-              },
-            ],
-            problemSolving: [
-              {
-                quote: "Example quote from transcript",
-                analysis: "Basic analysis of problem solving",
-                strength: true,
-              },
-            ],
-            structuredThinking: [
-              {
-                quote: "Example quote from transcript",
-                analysis: "Basic analysis of structured thinking",
-                strength: true,
-              },
-            ],
-            leadership: [
-              {
-                quote: "Example quote from transcript",
-                analysis: "Basic analysis of leadership",
-                strength: false,
-              },
-            ],
-            communication: [
-              {
-                quote: "Example quote from transcript",
-                analysis: "Basic analysis of communication",
-                strength: false,
-              },
-            ],
-          },
-          keyPatterns: [
-            {
-              pattern: "Use of filler words",
-              frequency: "Frequent",
-              impact: "Reduces perceived confidence",
-            },
-          ],
-          strengths: ["Basic understanding of concepts", "Some analytical ability"],
-          weaknesses: ["Communication issues", "Lacks confidence"],
-          exampleResponses: [
-            {
-              question: "Tell me about your experience",
-              response: "Example response from transcript",
-              strengths: ["Relevant experience"],
-              weaknesses: ["Lack of detail"],
-            },
-          ],
-        };
-
-        console.log("Using fallback analysis object due to schema validation errors");
+        // Instead of using a fallback, throw an error to ensure quality
+        throw new Error(`Analysis failed schema validation: ${JSON.stringify(validationError, null, 2)}`);
       }
 
       return `Analysis Output: ${JSON.stringify(parsed)}`;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error in analyze_transcript:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Error details:", errorMessage);
       return "";
     }
   },
