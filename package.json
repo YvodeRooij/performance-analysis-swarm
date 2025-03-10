@@ -1,12 +1,23 @@
 {
   "name": "performance-analysis-swarm",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "A LangGraph Swarm system for analyzing consulting case interview performance",
+  "main": "src/index.js",
   "scripts": {
+    "start": "ts-node src/index.ts",
+    "dev": "ts-node-dev --respawn src/index.ts",
+    "build": "tsc",
+    "lint": "eslint . --ext .ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "langgraph",
+    "swarm",
+    "performance",
+    "analysis",
+    "interview",
+    "competency"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -14,7 +25,17 @@
     "@langchain/langgraph": "^0.2.54",
     "@langchain/langgraph-swarm": "^0.0.3",
     "@langchain/openai": "^0.4.4",
+    "chart.js": "^4.4.2",
     "dotenv": "^16.4.7",
+    "node-fetch": "^3.3.2",
+    "openai": "^4.28.4",
     "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "eslint": "^8.57.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.4.5"
   }
 }
